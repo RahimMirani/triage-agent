@@ -1,0 +1,86 @@
+[
+  {
+    "provider_id": "prov_maya_chen",
+    "name": "Maya Chen, MS CCC-SLP",
+    "discipline": "SLP",
+    "languages": ["en"],
+    "age_range": "2-8",
+    "caseload_status": "accepting",
+    "next_available_slots": [
+      {
+        "slot_id": "slot_slp_maya_2026_04_29_0900",
+        "start": "2026-04-29T09:00:00-07:00",
+        "appointment_type": "evaluation"
+      },
+      {
+        "slot_id": "slot_slp_maya_2026_05_01_1530",
+        "start": "2026-05-01T15:30:00-07:00",
+        "appointment_type": "evaluation"
+      }
+    ]
+  },
+  {
+    "provider_id": "prov_lucia_morales",
+    "name": "Lucia Morales, MA CCC-SLP",
+    "discipline": "SLP",
+    "languages": ["en", "es"],
+    "age_range": "0-12",
+    "caseload_status": "accepting",
+    "next_available_slots": [
+      {
+        "slot_id": "slot_slp_lucia_2026_04_30_1100",
+        "start": "2026-04-30T11:00:00-07:00",
+        "appointment_type": "evaluation"
+      },
+      {
+        "slot_id": "slot_slp_lucia_2026_05_04_1400",
+        "start": "2026-05-04T14:00:00-07:00",
+        "appointment_type": "evaluation"
+      }
+    ]
+  },
+  {
+    "provider_id": "prov_james_owens",
+    "name": "James Owens, OTR/L",
+    "discipline": "OT",
+    "languages": ["en"],
+    "age_range": "3-18",
+    "caseload_status": "limited",
+    "next_available_slots": [
+      {
+        "slot_id": "slot_ot_james_2026_05_05_1000",
+        "start": "2026-05-05T10:00:00-07:00",
+        "appointment_type": "evaluation"
+      }
+    ]
+  },
+  {
+    "provider_id": "prov_priya_shah",
+    "name": "Priya Shah, PT, DPT",
+    "discipline": "PT",
+    "languages": ["en"],
+    "age_range": "0-18",
+    "caseload_status": "accepting",
+    "next_available_slots": [
+      {
+        "slot_id": "slot_pt_priya_2026_04_29_1300",
+        "start": "2026-04-29T13:00:00-07:00",
+        "appointment_type": "evaluation"
+      },
+      {
+        "slot_id": "slot_pt_priya_2026_05_06_0900",
+        "start": "2026-05-06T09:00:00-07:00",
+        "appointment_type": "evaluation"
+      }
+    ]
+  },
+  {
+    "provider_id": "prov_sofia_reyes",
+    "name": "Sofia Reyes, OTR/L",
+    "discipline": "OT",
+    "languages": ["en", "es"],
+    "age_range": "4-18",
+    "caseload_status": "full",
+    "next_available_slots": []
+  }
+]

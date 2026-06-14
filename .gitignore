@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.trace/
+_internal/
+/output.*.json
+/take-home.tgz
+.env
+.env.*
+!.env.example
+*.log

@@ -1,0 +1,73 @@
+{
+  "generated_at": "2026-04-28T15:30:00.000Z",
+  "summary": {
+    "total_items": 1,
+    "p0_count": 0,
+    "p1_count": 0,
+    "requires_human_review_count": 1
+  },
+  "items": [
+    {
+      "item_id": "item_3",
+      "classification": "new_referral",
+      "urgency": "P2",
+      "requires_human_review": true,
+      "extracted_intake": {
+        "child_name": "Owen Brooks",
+        "dob_or_age": "2020-02-11",
+        "parent_contact": "Rachel Brooks, 555-0103, rachel.brooks@example.com",
+        "discipline": ["OT"],
+        "diagnosis_or_concern": "sensory processing and feeding tolerance",
+        "payer": "Kaiser HMO",
+        "member_id": "KSR-4471"
+      },
+      "missing_info": [],
+      "tools_called": [
+        {
+          "call_id": "example_verify_insurance_item_3",
+          "name": "verify_insurance",
+          "args": {
+            "member_id": "KSR-4471",
+            "payer": "Kaiser HMO"
+          },
+          "result_summary": "insurance status: out_of_network (Kaiser HMO)"
+        },
+        {
+          "call_id": "example_lookup_policy_item_3",
+          "name": "lookup_policy",
+          "args": {
+            "topic": "insurance"
+          },
+          "result_summary": "3 policy snippets for insurance"
+        },
+        {
+          "call_id": "example_create_task_item_3",
+          "name": "create_task",
+          "args": {
+            "assignee": "billing",
+            "due": "2026-04-30",
+            "notes": "Kaiser HMO verified out of network for Owen Brooks. Call parent before any slot hold or scheduling workflow.",
+            "title": "Discuss out-of-network benefits for Owen Brooks"
+          },
+          "result_summary": "created task task_example_oon_benefits for billing"
+        },
+        {
+          "call_id": "example_draft_message_item_3",
+          "name": "draft_message",
+          "args": {
+            "body": "Hi Rachel, thank you for sending Owen's referral. Our billing team needs to review the Kaiser plan because it appears to be out of network for Cedar Kids Therapy. A team member will follow up with options before we move forward with scheduling.",
+            "channel": "email",
+            "language": "en",
+            "recipient": "rachel.brooks@example.com"
+          },
+          "result_summary": "created draft draft_example_oon (email, en)"
+        }
+      ],
+      "recommended_next_action": "Billing should review out-of-network options with the parent before staff considers any appointment hold.",
+      "draft_reply": "Hi Rachel, thank you for sending Owen's referral. Our billing team needs to review the Kaiser plan because it appears to be out of network for Cedar Kids Therapy. A team member will follow up with options before we move forward with scheduling.",
+      "task_ids": ["task_example_oon_benefits"],
+      "escalation": null,
+      "decision_rationale": "Referral has enough clinical intake data for OT, but insurance verification returned out_of_network and policy requires a benefits conversation before any slot hold or scheduling step."
+    }
+  ]
+}

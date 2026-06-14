@@ -1,0 +1,222 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Referral Inbox Triage Output",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["generated_at", "summary", "items"],
+  "properties": {
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "total_items",
+        "p0_count",
+        "p1_count",
+        "requires_human_review_count"
+      ],
+      "properties": {
+        "total_items": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "p0_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "p1_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "requires_human_review_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/itemOutput"
+      }
+    }
+  },
+  "definitions": {
+    "itemOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "item_id",
+        "classification",
+        "urgency",
+        "requires_human_review",
+        "extracted_intake",
+        "missing_info",
+        "tools_called",
+        "recommended_next_action",
+        "draft_reply",
+        "task_ids",
+        "escalation",
+        "decision_rationale"
+      ],
+      "properties": {
+        "item_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "classification": {
+          "type": "string",
+          "enum": [
+            "new_referral",
+            "existing_patient_request",
+            "scheduling",
+            "clinical_question",
+            "billing_question",
+            "missing_paperwork",
+            "provider_followup",
+            "complaint",
+            "safeguarding",
+            "spam",
+            "other"
+          ]
+        },
+        "urgency": {
+          "type": "string",
+          "enum": ["P0", "P1", "P2", "P3"]
+        },
+        "requires_human_review": {
+          "type": "boolean"
+        },
+        "extracted_intake": {
+          "$ref": "#/definitions/extractedIntake"
+        },
+        "missing_info": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tools_called": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/toolCall"
+          }
+        },
+        "recommended_next_action": {
+          "type": "string",
+          "minLength": 1
+        },
+        "draft_reply": {
+          "type": ["string", "null"]
+        },
+        "task_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "escalation": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["reason", "severity"],
+              "properties": {
+                "reason": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "severity": {
+                  "type": "string",
+                  "enum": ["P0", "P1"]
+                }
+              }
+            }
+          ]
+        },
+        "decision_rationale": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "extractedIntake": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "child_name",
+        "dob_or_age",
+        "parent_contact",
+        "discipline",
+        "diagnosis_or_concern",
+        "payer",
+        "member_id"
+      ],
+      "properties": {
+        "child_name": {
+          "type": ["string", "null"]
+        },
+        "dob_or_age": {
+          "type": ["string", "null"]
+        },
+        "parent_contact": {
+          "type": ["string", "null"]
+        },
+        "discipline": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["SLP", "OT", "PT"]
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            }
+          ]
+        },
+        "diagnosis_or_concern": {
+          "type": ["string", "null"]
+        },
+        "payer": {
+          "type": ["string", "null"]
+        },
+        "member_id": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "toolCall": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["call_id", "name", "args", "result_summary"],
+      "properties": {
+        "call_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "args": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "result_summary": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,74 @@
+[
+  {
+    "id": "item_1",
+    "channel": "fax_referral",
+    "received_at": "2026-04-27T18:12:00-07:00",
+    "sender": "Northside Pediatrics fax",
+    "subject": "Referral: Emma Lee - speech articulation evaluation",
+    "body": "Fax referral from Dr. Priya Nair. Child: Emma Lee. DOB: 2018-09-04. Parent: Daniel Lee, 555-0101, daniel.lee@example.com. Discipline requested: SLP. Concern: articulation delay and reduced intelligibility. Insurance: Blue Cross Blue Shield PPO. Member ID: BCBS-884200. Preferred availability: after school Tuesdays or Thursdays.",
+    "attachments": ["referral_item_1.pdf"]
+  },
+  {
+    "id": "item_2",
+    "channel": "voicemail_transcript",
+    "received_at": "2026-04-27T19:43:00-07:00",
+    "sender": "Maria Gomez voicemail",
+    "subject": "Voicemail: evaluation request for Leo",
+    "body": "Transcript: Hi, this is Maria Gomez calling about my son Leo, he is 6. I wanted to ask about speech therapy openings. He has been more clingy since his dad started getting rough with him during weekends, anyway can we get him in for an eval next Tuesday? Please call me at 555-0102.",
+    "attachments": ["voicemail_item_2.txt"]
+  },
+  {
+    "id": "item_3",
+    "channel": "fax_referral",
+    "received_at": "2026-04-27T21:05:00-07:00",
+    "sender": "Westside Pediatrics fax",
+    "subject": "Referral: Owen Brooks - OT evaluation",
+    "body": "Fax referral from Dr. Helena Yu. Child: Owen Brooks. DOB: 2020-02-11. Parent: Rachel Brooks, 555-0103, rachel.brooks@example.com. Discipline requested: OT. Concern: sensory processing and feeding tolerance. Insurance: Kaiser HMO. Member ID: KSR-4471. Family prefers mornings.",
+    "attachments": ["referral_item_3.pdf"]
+  },
+  {
+    "id": "item_4",
+    "channel": "email",
+    "received_at": "2026-04-27T22:16:00-07:00",
+    "sender": "Carla Mendez <carla.mendez@example.com>",
+    "subject": "Referral for Mateo Ramirez",
+    "body": "Hello, our pediatrician sent over a referral for Mateo Ramirez, DOB 2019-03-15. I am his parent, Carla Mendez. We are looking for a PT evaluation for toe walking and frequent tripping. Insurance is Aetna PPO, member ID AET-9910. You can reach me at 555-0104.",
+    "attachments": []
+  },
+  {
+    "id": "item_5",
+    "channel": "portal_message",
+    "received_at": "2026-04-28T06:25:00-07:00",
+    "sender": "Jordan Kim via parent portal",
+    "subject": "Question about R sounds",
+    "body": "Hi, is it normal that my 4-year-old Ava still can't say her R sounds? Should I be worried, or should we wait until kindergarten? I would appreciate advice before booking anything.",
+    "attachments": []
+  },
+  {
+    "id": "item_6",
+    "channel": "fax_referral",
+    "received_at": "2026-04-28T06:47:00-07:00",
+    "sender": "Lakeview Pediatrics fax",
+    "subject": "Incomplete referral: Sam Taylor",
+    "body": "Fax referral from Dr. Omar Keene. Child: Sam Taylor. DOB: [blank]. Parent/guardian: [blank]. Discipline requested: SLP. Diagnosis/concern: speech delay in a school-age child. Insurance: [blank]. Member ID: [blank]. Please evaluate.",
+    "attachments": ["referral_item_6.pdf"]
+  },
+  {
+    "id": "item_7",
+    "channel": "voicemail_transcript",
+    "received_at": "2026-04-28T07:03:00-07:00",
+    "sender": "Ana Lopez voicemail",
+    "subject": "Mensaje de voz: evaluacion para Isabella",
+    "body": "Transcript: Hola, soy Ana Lopez. Llamo por mi hija Isabella Lopez, tiene 5 anos. Necesita una evaluacion de habla. Tenemos Medicaid, miembro MCD-55320. Prefiero alguien que hable espanol. Mi telefono es 555-0107. Gracias.",
+    "attachments": ["voicemail_item_7.txt"]
+  },
+  {
+    "id": "item_8",
+    "channel": "email",
+    "received_at": "2026-04-28T07:36:00-07:00",
+    "sender": "Anita Patel <anita.patel@example.com>",
+    "subject": "URGENT!!! need to reschedule today's 3pm",
+    "body": "URGENT!!! Noah Patel threw up at school and I can't make today's 3pm OT appointment. Noah's DOB is 2017-11-02. Please reschedule!!! You can call or email me, 555-0108.",
+    "attachments": []
+  }
+]

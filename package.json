@@ -1,0 +1,22 @@
+{
+  "name": "agents-take-home-assignment",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "triage": "tsx src/index.ts",
+    "validate": "tsx src/validate.ts",
+    "typecheck": "tsc --noEmit",
+    "package": "tar -czf take-home.tgz README.md package.json package-lock.json tsconfig.json .gitignore data/inbox.json data/policies.md data/providers.json data/example_output.json schema/output.schema.json src/agent.ts src/index.ts src/tools.ts src/types.ts src/validate.ts"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "tsx": "^4.19.2",
+    "ulid": "^2.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2"
+  }
+}
