@@ -20,7 +20,9 @@ import type {
   ExtractedIntake,
   InboxItem,
   ItemOutput,
+  Patient,
   PolicyTopic,
+  Slot,
   ToolCall,
   ToolResult,
   Urgency,
@@ -367,7 +369,140 @@ export function classifyDeterministic(item: InboxItem): {
 
 type AnyToolResult = ToolResult<unknown>;
 
-async function dispatchTool(
+// Models occasionally HTML-escape literal characters (e.g. "<" -> "&lt;") in
+// free-text args. Decode them deterministically so the audited args/drafts are
+// always clean plain text, regardless of model behavior.
+function decodeEntities(value: string): string {
+  return value
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#0?39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, "&");
+}
+
+function sanitizeToolInput(
+  input: Record<string, unknown>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, val] of Object.entries(input)) {
+    out[key] = typeof val === "string" ? decodeEntities(val) : val;
+  }
+  return out;
+}
+
+/**
+ * Per-item mutable state used to enforce deterministic policy guardrails at the
+ * tool-dispatch boundary (where they can prevent a bad audited action, unlike
+ * post-hoc overrides which cannot un-call a tool).
+ */
+interface ItemState {
+  item: InboxItem;
+  identityUnverified: boolean;
+  slotsById: Map<string, Slot>;
+  schedulingPref: SchedulingPreference;
+}
+
+interface SchedulingPreference {
+  afterSchool: boolean;
+  mornings: boolean;
+  days: Set<number>; // 0=Sun .. 6=Sat
+  raw: string | null;
+}
+
+function newItemState(item: InboxItem): ItemState {
+  return {
+    item,
+    identityUnverified: false,
+    slotsById: new Map(),
+    schedulingPref: parseSchedulingPreference(item),
+  };
+}
+
+function parseSchedulingPreference(item: InboxItem): SchedulingPreference {
+  const text = `${item.subject}\n${item.body}`;
+  const dayNames: Record<string, number> = {
+    sunday: 0,
+    monday: 1,
+    tuesday: 2,
+    wednesday: 3,
+    thursday: 4,
+    friday: 5,
+    saturday: 6,
+  };
+  const days = new Set<number>();
+  for (const [name, num] of Object.entries(dayNames)) {
+    if (new RegExp(`${name}s?`, "i").test(text)) days.add(num);
+  }
+  const afterSchool = /after[\s-]?school/i.test(text);
+  const mornings = /\bmornings?\b/i.test(text);
+  let raw: string | null = null;
+  if (afterSchool || mornings || days.size > 0) {
+    const m = text.match(/(?:Preferred availability|prefers?|preference)[:\s][^.\n]*/i);
+    raw = m ? m[0].trim() : [afterSchool ? "after-school" : "", mornings ? "mornings" : ""].filter(Boolean).join(", ") || null;
+  }
+  return { afterSchool, mornings, days, raw };
+}
+
+/** Returns true if a slot satisfies every stated hard scheduling preference. */
+function slotMatchesPreference(slot: Slot, pref: SchedulingPreference): boolean {
+  const m = slot.start.match(/(\d{4})-(\d{2})-(\d{2})T(\d{2}):/);
+  if (!m) return true; // unparseable; do not block on it
+  const [, y, mo, d, h] = m;
+  const weekday = new Date(Date.UTC(Number(y), Number(mo) - 1, Number(d))).getUTCDay();
+  const hour = Number(h);
+  if (pref.afterSchool && hour < 15) return false;
+  if (pref.mornings && hour >= 12) return false;
+  if (pref.days.size > 0 && !pref.days.has(weekday)) return false;
+  return true;
+}
+
+/** All tokens of any matched patient's guardian name appear in the item text. */
+function guardianInText(matches: Patient[], item: InboxItem): boolean {
+  const haystack = `${item.sender} ${item.subject} ${item.body}`.toLowerCase();
+  return matches.some((p) => {
+    const tokens = (p.guardian_name || "")
+      .toLowerCase()
+      .split(/\s+/)
+      .filter((t) => t.length > 1);
+    return tokens.length > 0 && tokens.every((t) => haystack.includes(t));
+  });
+}
+
+function minimalAckBody(item: InboxItem): string {
+  return isSpanish(item)
+    ? "Hola, gracias por su mensaje. Antes de poder hablar sobre cualquier detalle o próximos pasos, nuestro equipo de admisión debe verificar la información de la cuenta y la autorización registrada. Un miembro de nuestro equipo se comunicará con usted en breve."
+    : "Hello, thank you for your message. Before we can discuss any details or next steps, our intake team needs to verify the account and authorization information on file. A team member will reach out to you shortly.";
+}
+
+/** Returns a block reason if a hold_slot call should be refused, else null. */
+function holdBlockReason(slotId: string | undefined, state: ItemState): string | null {
+  if (state.identityUnverified) {
+    return "Hold blocked: the requester's identity/guardian authorization is not verified against the patient record. Do not hold a slot or disclose coverage; create an intake task to verify authorization first, and draft only a minimal acknowledgement.";
+  }
+  const slot = slotId ? state.slotsById.get(slotId) : undefined;
+  if (slot && !slotMatchesPreference(slot, state.schedulingPref)) {
+    return `Hold blocked: slot ${slot.start} does not match the family's stated scheduling preference${state.schedulingPref.raw ? ` (${state.schedulingPref.raw})` : ""}. Do not hold this slot; create a task to confirm acceptable alternatives with the family.`;
+  }
+  return null;
+}
+
+function blockedResult(
+  name: string,
+  args: Record<string, unknown>,
+  reason: string,
+): AnyToolResult {
+  return {
+    call_id: "blocked",
+    name,
+    args,
+    result_summary: reason,
+    data: { blocked: true, reason },
+  };
+}
+
+async function executeTool(
   name: string,
   input: Record<string, unknown>,
 ): Promise<AnyToolResult> {
@@ -404,6 +539,43 @@ async function dispatchTool(
     default:
       throw new Error(`Unknown tool requested by model: ${name}`);
   }
+}
+
+async function dispatchTool(
+  name: string,
+  rawInput: Record<string, unknown>,
+  state: ItemState,
+): Promise<AnyToolResult> {
+  // Guardrail: refuse holds that would commit capacity on an unverified
+  // identity or a slot that does not match the family's stated preference.
+  if (name === "hold_slot") {
+    const reason = holdBlockReason(rawInput.slot_id as string | undefined, state);
+    if (reason) return blockedResult("hold_slot", sanitizeToolInput(rawInput), reason);
+  }
+
+  let input = sanitizeToolInput(rawInput);
+
+  // Guardrail: when identity/authorization is unverified, never disclose
+  // coverage or scheduling in an outbound draft; force a minimal acknowledgement.
+  if (name === "draft_message" && state.identityUnverified) {
+    input = { ...input, body: minimalAckBody(state.item) };
+  }
+
+  const result = await executeTool(name, input);
+
+  // Update state from results so later guardrails can act on them.
+  if (name === "search_patient") {
+    const matches = (result.data as Patient[]) || [];
+    if (matches.length > 0 && !guardianInText(matches, state.item)) {
+      state.identityUnverified = true;
+    }
+  } else if (name === "find_slots") {
+    for (const slot of (result.data as Slot[]) || []) {
+      state.slotsById.set(slot.slot_id, slot);
+    }
+  }
+
+  return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -473,8 +645,12 @@ Default to P2. Over-escalation is itself a failure: do NOT mark something P0 jus
 ACTION MODEL:
 - Use tools as part of your reasoning, not performatively. Verify insurance when a payer is present; look up policy when a safeguarding/clinical/insurance/scheduling/language question applies; search for an existing patient when you have a name and DOB; find slots only when intake is genuinely scheduling-ready; create tasks to route work to the right team (front_desk, intake, billing, clinical_lead); draft messages for staff to review.
 - NEVER auto-send: use draft_message only. NEVER schedule: find_slots/hold_slot are review-only.
+- Only hold_slot when intake is verified AND the slot matches the family's stated scheduling constraints. If no candidate matches a stated hard preference (e.g. "after-school Tue/Thu"), do NOT hold a slot - create a task asking the family to confirm acceptable alternatives.
+- AUTHORIZATION/PRIVACY: if search_patient returns an existing record whose guardian of record does not match the requester, treat it as an authorization risk. Do NOT hold a slot and do NOT disclose coverage, benefits, or scheduling in the reply. Create an intake task to verify authorization and draft only a minimal acknowledgement.
 - Drafts must be clear, empathetic, concise, free of clinical advice, and must not imply a message was already sent.
 - Write all text fields (recipient, body, notes, titles) as plain text. Do NOT HTML-escape characters: use literal < > & ' ", never &lt; &gt; &amp; or similar entities.
+- This inbox is triaged on Monday morning. Set P0 same-hour and P1 same-day task due dates to the Monday processing day or later, not the original weekend receipt date. Use task wording like "coordinate scheduling" or "confirm the held slot for staff booking" rather than implying you scheduled.
+- When drafting in Spanish, use correct orthography with accents (e.g. evaluación, está, español, próximos).
 
 ESCALATION FIELD: attach an escalation object only for genuine safety or urgent escalations that need a human beyond normal routing - P0 safeguarding/imminent harm always escalates; use P1 only when an operational issue truly needs an escalation, not for routine work. A routine same-day reschedule handled by a front-desk task is P1 urgency but does NOT need an escalation object (leave it null). Routing work via create_task is not the same as escalating.
 
@@ -731,6 +907,7 @@ function coerceEscalation(
 async function runItemAgentLoop(
   client: Anthropic,
   item: InboxItem,
+  state: ItemState,
 ): Promise<Decision | null> {
   const tools = buildTools();
   const messages: Anthropic.MessageParam[] = [
@@ -780,7 +957,7 @@ async function runItemAgentLoop(
         continue;
       }
       try {
-        const result = await dispatchTool(toolUse.name, input);
+        const result = await dispatchTool(toolUse.name, input, state);
         toolResults.push({
           type: "tool_result",
           tool_use_id: toolUse.id,
@@ -986,7 +1163,35 @@ async function newReferralDecision(
   const missing = missingIntakeFields(intake);
 
   if (intake.child_name && intake.dob_or_age && /^\d{4}-\d{2}-\d{2}$/.test(intake.dob_or_age)) {
-    await search_patient({ name: intake.child_name, dob: intake.dob_or_age });
+    const searchRes = await search_patient({
+      name: intake.child_name,
+      dob: intake.dob_or_age,
+    });
+    const matches = (searchRes.data as Patient[]) || [];
+    // Authorization guardrail: existing record but requester is not the known
+    // guardian. Do not disclose coverage or schedule; verify authorization first.
+    if (matches.length > 0 && !guardianInText(matches, item)) {
+      await create_task({
+        assignee: "intake",
+        title: `Verify guardian/authorization before scheduling for ${child ?? "patient"}`,
+        due: dueDate(item, 1),
+        notes: `Existing patient record found, but the requester (${item.sender}) does not match the guardian of record. Verify relationship/authorization before disclosing any coverage, PHI, or scheduling. No slot held.`,
+      });
+      const body = minimalAckBody(item);
+      await draft_message({ recipient, channel, body, language: lang });
+      return {
+        classification: "new_referral",
+        urgency: "P2",
+        extracted_intake: intake,
+        missing_info: ["Guardian/authorization verification (requester does not match guardian of record)"],
+        recommended_next_action:
+          "Verify the requester's authorization against the guardian of record before disclosing coverage or scheduling.",
+        draft_reply: body,
+        escalation: null,
+        decision_rationale:
+          "An existing patient record exists but the requester is not the guardian of record; per privacy/authorization policy, no coverage was disclosed and no slot was held until intake verifies authorization.",
+      };
+    }
   }
 
   let insuranceStatus: string = "unknown";
@@ -1282,10 +1487,11 @@ function normalizeIntake(intake: ExtractedIntake | undefined): ExtractedIntake {
 async function triageItem(item: InboxItem, client: Anthropic | null): Promise<ItemOutput> {
   return withItemContext(item.id, async () => {
     let decision: Decision | null = null;
+    const state = newItemState(item);
 
     if (client) {
       try {
-        decision = await runItemAgentLoop(client, item);
+        decision = await runItemAgentLoop(client, item, state);
       } catch (error) {
         console.error(
           `LLM loop failed for ${item.id}; using deterministic fallback. ${
