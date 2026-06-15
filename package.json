@@ -6,6 +6,7 @@
   "scripts": {
     "triage": "tsx src/index.ts",
     "validate": "tsx src/validate.ts",
+    "test": "tsx --test test/*.test.ts",
     "typecheck": "tsc --noEmit",
     "package": "tar -czf take-home.tgz README.md package.json package-lock.json tsconfig.json .gitignore data/inbox.json data/policies.md data/providers.json data/example_output.json schema/output.schema.json src/agent.ts src/index.ts src/tools.ts src/types.ts src/validate.ts"
   },
