@@ -474,8 +474,11 @@ ACTION MODEL:
 - Use tools as part of your reasoning, not performatively. Verify insurance when a payer is present; look up policy when a safeguarding/clinical/insurance/scheduling/language question applies; search for an existing patient when you have a name and DOB; find slots only when intake is genuinely scheduling-ready; create tasks to route work to the right team (front_desk, intake, billing, clinical_lead); draft messages for staff to review.
 - NEVER auto-send: use draft_message only. NEVER schedule: find_slots/hold_slot are review-only.
 - Drafts must be clear, empathetic, concise, free of clinical advice, and must not imply a message was already sent.
+- Write all text fields (recipient, body, notes, titles) as plain text. Do NOT HTML-escape characters: use literal < > & ' ", never &lt; &gt; &amp; or similar entities.
 
-When you have gathered what you need, call submit_triage exactly once with your final decision. Base draft_reply on the draft_message you created (or null if no reply is appropriate, e.g. spam). Set escalation only for genuine P0/P1 escalations.`;
+ESCALATION FIELD: attach an escalation object only for genuine safety or urgent escalations that need a human beyond normal routing - P0 safeguarding/imminent harm always escalates; use P1 only when an operational issue truly needs an escalation, not for routine work. A routine same-day reschedule handled by a front-desk task is P1 urgency but does NOT need an escalation object (leave it null). Routing work via create_task is not the same as escalating.
+
+When you have gathered what you need, call submit_triage exactly once with your final decision. Base draft_reply on the draft_message you created (or null if no reply is appropriate, e.g. spam).`;
 
 function buildTools(): Anthropic.Tool[] {
   return [
