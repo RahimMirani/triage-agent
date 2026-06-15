@@ -1,3 +1,5 @@
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
 import {
   create_task,
@@ -408,8 +410,40 @@ async function dispatchTool(
 // LLM agent loop
 // ---------------------------------------------------------------------------
 
+/**
+ * Minimal, dependency-free .env loader. tsx/Node do not auto-load .env, so we
+ * read it ourselves. Only fills variables that are not already set, and is a
+ * no-op if the file is absent (keeps tests and reviewers unaffected).
+ */
+function loadDotEnv(): void {
+  try {
+    const path = resolve(process.cwd(), ".env");
+    if (!existsSync(path)) return;
+    for (const rawLine of readFileSync(path, "utf8").split(/\r?\n/)) {
+      const line = rawLine.trim();
+      if (!line || line.startsWith("#")) continue;
+      const eq = line.indexOf("=");
+      if (eq === -1) continue;
+      const key = line.slice(0, eq).trim();
+      let value = line.slice(eq + 1).trim();
+      if (
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))
+      ) {
+        value = value.slice(1, -1);
+      }
+      if (key && process.env[key] === undefined) {
+        process.env[key] = value;
+      }
+    }
+  } catch {
+    // Best effort: a malformed .env should never crash triage.
+  }
+}
+
 let cachedClient: Anthropic | null = null;
 function getClient(): Anthropic | null {
+  loadDotEnv();
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return null;
   if (!cachedClient) cachedClient = new Anthropic({ apiKey });
@@ -704,7 +738,6 @@ async function runItemAgentLoop(
     const response = await createWithRetry(client, {
       model: process.env.ANTHROPIC_MODEL || DEFAULT_MODEL,
       max_tokens: MAX_TOKENS,
-      temperature: 0,
       system: SYSTEM_PROMPT,
       tools,
       messages,

@@ -47,8 +47,9 @@ LLM-driven version. Both pass `npm run validate`.
 - **Language/runtime:** TypeScript on Node LTS, run via `tsx`. npm for deps.
 - **LLM:** Anthropic Claude via `@anthropic-ai/sdk`. Default model
   `claude-opus-4-8`, overridable with `ANTHROPIC_MODEL` (e.g.
-  `claude-sonnet-4-6` for cheaper/faster runs). `temperature: 0`. Model choice
-  is not part of the rubric.
+  `claude-sonnet-4-6` for cheaper/faster runs). Model choice is not part of the
+  rubric. The key is loaded from the shell or from a gitignored `.env` via a
+  tiny built-in loader (no `dotenv` dependency).
 - **Validation:** `ajv` + `ajv-formats` (provided validator), unchanged.
 - **Tests:** Node's built-in `node:test` + `node:assert` (zero extra deps).
 - **Secrets:** the key is read from `process.env.ANTHROPIC_API_KEY` only and is
