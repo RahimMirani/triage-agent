@@ -174,23 +174,31 @@ export function extractIntake(item: InboxItem): ExtractedIntake {
 
 function cleanField(value: string | undefined | null): string | null {
   if (!value) return null;
-  const trimmed = value.trim().replace(/[.;,]+$/, "");
+  let trimmed = value.trim().replace(/\s+/g, " ");
+  // Strip trailing label fragments that bleed in from "Name. DOB: ..." lines.
+  trimmed = trimmed.replace(/[\s.]+(DOB|Parent|Insurance|Member).*$/i, "");
+  trimmed = trimmed.trim().replace(/[.;,]+$/, "");
   if (!trimmed || /^\[?\s*blank\s*\]?$/i.test(trimmed)) return null;
   return trimmed;
 }
 
 function extractChildName(item: InboxItem, text: string): string | null {
+  const NAME = "[A-Z][a-zà-ÿ'\\-]+";
   const patterns: RegExp[] = [
-    /Child:\s*([A-Z][\p{L}.'-]+(?:\s+[A-Z][\p{L}.'-]+)*)/u,
-    /referral for\s+([A-Z][\p{L}'-]+\s+[A-Z][\p{L}'-]+)/u,
-    /(?:my )?(?:son|daughter|child|kid)\s+([A-Z][\p{L}'-]+(?:\s+[A-Z][\p{L}'-]+)?)/u,
-    /por mi (?:hija|hijo)\s+([A-Z][\p{L}'-]+(?:\s+[A-Z][\p{L}'-]+)?)/u,
+    new RegExp(`Child:\\s*(${NAME}(?:\\s+${NAME})*?)(?=\\s*[.\\n]|\\s+DOB)`, "u"),
+    new RegExp(`referral for\\s+(${NAME}\\s+${NAME})`, "u"),
+    new RegExp(`(?:son|daughter|child|kid|hija|hijo)\\s+(?:named\\s+)?(${NAME}(?:\\s+${NAME})?)`, "u"),
+    // Possessive or subject-position name, e.g. "Noah Patel threw up", "Noah's DOB".
+    new RegExp(`\\b(${NAME}\\s+${NAME})(?='s\\b|\\s+(?:threw|is|has|was|tiene|DOB|\\())`, "u"),
   ];
   for (const re of patterns) {
     const m = text.match(re);
-    if (m) return cleanField(m[1]);
+    if (m) {
+      const cleaned = cleanField(m[1]);
+      if (cleaned) return cleaned;
+    }
   }
-  const subj = item.subject.match(/(?:Referral|referral)[:]?\s*([A-Z][\p{L}'-]+\s+[A-Z][\p{L}'-]+)/u);
+  const subj = item.subject.match(new RegExp(`(?:Referral|referral)[:]?\\s*(${NAME}\\s+${NAME})`, "u"));
   if (subj) return cleanField(subj[1]);
   return null;
 }
@@ -220,10 +228,13 @@ function extractContact(item: InboxItem, text: string): string | null {
   }
   const phone = text.match(/\b(\d{3}[-.\s]?\d{4})\b|\b(\d{3}[-.\s]?\d{3}[-.\s]?\d{4})\b/);
   if (phone) parts.push(phone[0].trim());
-  const email = text.match(/[\w.+-]+@[\w-]+\.[\w.-]+/);
-  if (email) parts.push(email[0]);
+  const email = (text.match(EMAIL_RE) || item.sender.match(EMAIL_RE))?.[0];
+  if (email) parts.push(email);
   return parts.length ? parts.join(", ") : null;
 }
+
+// Email that does not greedily swallow a trailing sentence period.
+const EMAIL_RE = /[\w.+-]+@[\w-]+\.[\w-]+(?:\.[\w-]+)*/;
 
 function extractDiscipline(text: string): Discipline[] | null {
   const found = new Set<Discipline>();
@@ -246,21 +257,20 @@ function extractConcern(text: string): string | null {
 }
 
 function extractPayer(text: string): string | null {
-  const labelled = text.match(/Insurance:?\s*([^\n.]+)/i);
-  if (labelled) {
-    const cleaned = cleanField(labelled[1]);
-    if (cleaned) return cleaned;
-  }
+  // Keyword-first: returns a clean payer phrase plus an optional plan word,
+  // avoiding bleed-in like "is Aetna PPO, member ID ...".
   const lower = text.toLowerCase();
   for (const payer of KNOWN_PAYERS) {
     const idx = lower.indexOf(payer);
     if (idx >= 0) {
-      // Capture the payer plus an optional plan word (PPO/HMO) as written.
-      const slice = text.slice(idx, idx + payer.length + 5);
-      const m = slice.match(/^[^\n,.]*(?:PPO|HMO|Select)?/i);
-      return (m ? m[0] : text.slice(idx, idx + payer.length)).trim();
+      const base = text.slice(idx, idx + payer.length);
+      const after = text.slice(idx + payer.length, idx + payer.length + 6);
+      const plan = after.match(/^\s+(PPO|HMO|EPO|POS|Select)\b/i);
+      return plan ? `${base} ${plan[1].toUpperCase()}` : base;
     }
   }
+  const labelled = text.match(/Insurance:?\s*(?:is\s+)?([^\n,.]+)/i);
+  if (labelled) return cleanField(labelled[1]);
   return null;
 }
 
@@ -333,7 +343,12 @@ export function classifyDeterministic(item: InboxItem): {
     return { classification: "clinical_question", urgency: "P2" };
   }
 
-  if (isFax || /\breferral\b/i.test(text)) {
+  const intakeIntent =
+    extractDiscipline(text) !== null &&
+    /\b(eval|evaluation|evaluaci[oó]n|therapy|openings?|appointment for|get .* in|intake|necesita|screening)\b/i.test(
+      text,
+    );
+  if (isFax || /\breferral\b/i.test(text) || intakeIntent) {
     return { classification: "new_referral", urgency: "P2" };
   }
 
@@ -958,7 +973,7 @@ async function newReferralDecision(
     });
     const body = spanishOrEnglish(
       lang,
-      `Hola ${greetingName}, gracias por la referencia${child ? ` de ${child}` : ""}. Confirmamos su cobertura y tenemos disponibilidad para una evaluacion. Un miembro de nuestro equipo le contactara para coordinar una cita. `,
+      `Hola ${greetingName}, gracias por la referencia${child ? ` de ${child}` : ""}. Confirmamos su cobertura y tenemos disponibilidad para una evaluacion. Un miembro de nuestro equipo le contactara para coordinar una cita.`,
       `Hi ${greetingName}, thank you for ${child ? `${child}'s` : "the"} referral. We've verified the insurance and have evaluation availability. A team member will reach out to coordinate an appointment for your review.`,
     );
     await draft_message({ recipient, channel, body, language: lang });
@@ -1049,9 +1064,17 @@ function missingIntakeFields(intake: ExtractedIntake): string[] {
   return missing;
 }
 
+function contactEmail(item: InboxItem, intake: ExtractedIntake): string | null {
+  return (
+    intake.parent_contact?.match(EMAIL_RE)?.[0] ||
+    item.sender.match(EMAIL_RE)?.[0] ||
+    null
+  );
+}
+
 function pickRecipient(item: InboxItem, intake: ExtractedIntake): string {
-  const email = intake.parent_contact?.match(/[\w.+-]+@[\w-]+\.[\w.-]+/);
-  if (email) return email[0];
+  const email = contactEmail(item, intake);
+  if (email) return email;
   const phone = intake.parent_contact?.match(/\d{3}[-.\s]?\d{4}/);
   if (phone) return phone[0];
   return item.sender;
@@ -1062,10 +1085,8 @@ function pickChannel(
   intake: ExtractedIntake,
 ): "portal" | "email" | "phone" {
   if (item.channel === "portal_message") return "portal";
-  if (intake.parent_contact && /[\w.+-]+@[\w-]+\.[\w.-]+/.test(intake.parent_contact)) {
-    return "email";
-  }
-  if (item.channel === "email") return "email";
+  // Keep channel consistent with the recipient we will actually use.
+  if (contactEmail(item, intake)) return "email";
   return "phone";
 }
 
